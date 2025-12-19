@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ari or Chenhao?</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-QD5VPF7ZFK"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-QD5VPF7ZFK');
+  </script>
+</head>
+<body>
+  <nav>
+    <span class="site-name">AI Hot Takes</span>
+    <div class="nav-links">
+      <a href="index.html" class="active">Play</a>
+      <a href="archive.html">Archive</a>
+      <a href="submit.html">Submit</a>
+      <a href="about.html">About</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>Ari or Chenhao?</h1>
+
+    <div id="game-area">
+      <div class="loading" id="loading">Loading this week's hot takes...</div>
+
+      <div id="game-content" class="hidden">
+        <div class="progress" id="progress"></div>
+
+        <div class="hot-take-card">
+          <p class="hot-take-text" id="hot-take-text"></p>
+
+          <div class="btn-group" id="guess-buttons">
+            <button class="btn btn-ari" onclick="guess('Ari')">Ari</button>
+            <button class="btn btn-chenhao" onclick="guess('Chenhao')">Chenhao</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="week-complete" class="hidden">
+        <div class="hot-take-card" style="text-align: center;">
+          <h2>Results</h2>
+          <p style="font-size: 1.2rem; margin: 1rem 0;">
+            You scored <span id="final-score"></span> out of <span id="final-total"></span>
+          </p>
+          <p id="score-message" style="margin-bottom: 1.5rem;"></p>
+        </div>
+        <div id="results-list"></div>
+        <div style="text-align: center; margin-top: 1.5rem;">
+          <a href="archive.html" class="btn btn-secondary">View Archive</a>
+        </div>
+      </div>
+
+      <div id="no-takes" class="hidden">
+        <div class="hot-take-card" style="text-align: center;">
+          <h2>No Hot Takes Yet</h2>
+          <p>Check back soon for this week's hot takes!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { db } from './js/firebase-config.js';
+    import { collection, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    let hotTakes = [];
+    let currentIndex = 0;
+    let score = 0;
+    let guesses = []; // Store user's guesses
+
+    // Get or create a guest ID
+    function getGuestId() {
+      let id = localStorage.getItem('guestId');
+      if (!id) {
+        id = 'guest_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('guestId', id);
+      }
+      return id;
+    }
+
+    // Escape HTML to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Format date as YYYY-MM-DD in local timezone
+    function formatDateLocal(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // Get Monday of current week
+    function getCurrentWeekMonday() {
+      const d = new Date();
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      d.setDate(diff);
+      return formatDateLocal(d);
+    }
+
+    async function loadHotTakes() {
+      try {
+        const weekOf = getCurrentWeekMonday();
+
+        const q = query(
+          collection(db, "hottakes"),
+          where("weekOf", "==", weekOf),
+          where("approved", "==", true)
+        );
+
+        const snapshot = await getDocs(q);
+        hotTakes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Shuffle the hot takes
+        hotTakes.sort(() => Math.random() - 0.5);
+
+        document.getElementById('loading').classList.add('hidden');
+
+        if (hotTakes.length === 0) {
+          document.getElementById('no-takes').classList.remove('hidden');
+        } else {
+          document.getElementById('game-content').classList.remove('hidden');
+          showCurrentTake();
+        }
+      } catch (error) {
+        console.error("Error loading hot takes:", error);
+        document.getElementById('loading').textContent = "Error loading hot takes. Please refresh.";
+      }
+    }
+
+    function showCurrentTake() {
+      const take = hotTakes[currentIndex];
+      document.getElementById('hot-take-text').textContent = take.text;
+      document.getElementById('progress').textContent = `${currentIndex + 1} of ${hotTakes.length}`;
+    }
+
+    window.guess = function(guessedAuthor) {
+      const take = hotTakes[currentIndex];
+      const correct = guessedAuthor === take.author;
+
+      // Store the guess
+      guesses.push({
+        text: take.text,
+        author: take.author,
+        guessed: guessedAuthor,
+        correct: correct
+      });
+
+      if (correct) {
+        score++;
+      }
+
+      // Move to next or show results
+      if (currentIndex < hotTakes.length - 1) {
+        currentIndex++;
+        showCurrentTake();
+      } else {
+        showComplete();
+      }
+    };
+
+    async function showComplete() {
+      document.getElementById('game-content').classList.add('hidden');
+      document.getElementById('week-complete').classList.remove('hidden');
+      document.getElementById('final-score').textContent = score;
+      document.getElementById('final-total').textContent = hotTakes.length;
+
+      const pct = score / hotTakes.length;
+      let msg = "";
+      if (pct === 1) msg = "Perfect! You really know Ari and Chenhao!";
+      else if (pct >= 0.8) msg = "Great job! You know them well.";
+      else if (pct >= 0.5) msg = "Not bad! Keep playing to learn their styles.";
+      else msg = "Tricky, right? They're hard to tell apart sometimes!";
+
+      document.getElementById('score-message').textContent = msg;
+
+      // Show all results
+      const resultsEl = document.getElementById('results-list');
+      resultsEl.innerHTML = guesses.map((g, i) => `
+        <div class="hot-take-card" style="margin-bottom: 1rem;">
+          <p class="hot-take-text">${escapeHtml(g.text)}</p>
+          <p style="text-align: center;">
+            <span class="author">${escapeHtml(g.author)}</span>
+            <span style="margin-left: 1rem; color: ${g.correct ? '#1b4332' : '#5c1a1a'};">
+              ${g.correct ? 'You got it!' : 'You guessed ' + escapeHtml(g.guessed)}
+            </span>
+          </p>
+        </div>
+      `).join('');
+
+      // Save results to Firestore
+      try {
+        await addDoc(collection(db, "responses"), {
+          guestId: getGuestId(),
+          weekOf: getCurrentWeekMonday(),
+          score: score,
+          total: hotTakes.length,
+          guesses: guesses,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error("Error saving response:", error);
+      }
+    }
+
+    loadHotTakes();
+  </script>
+</body>
+</html>

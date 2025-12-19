@@ -1,0 +1,315 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #ffffff;
+  color: #333;
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* Navigation */
+nav {
+  background: #800000;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.site-name {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.2rem;
+  margin-right: auto;
+}
+
+.nav-links {
+  display: flex;
+  gap: 1rem;
+}
+
+nav a {
+  color: #eee;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+nav a:hover,
+nav a.active {
+  background: #5c0000;
+}
+
+/* Headers */
+h1 {
+  text-align: center;
+  margin-bottom: 2rem;
+  font-size: 2rem;
+}
+
+h2 {
+  margin-bottom: 1rem;
+}
+
+/* Hot Take Card */
+.hot-take-card {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e9ecef;
+}
+
+.hot-take-text {
+  font-size: 1.4rem;
+  font-style: italic;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.hot-take-text::before,
+.hot-take-text::after {
+  content: '"';
+  color: #e94560;
+}
+
+/* Buttons */
+.btn-group {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.btn {
+  padding: 0.75rem 2rem;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 0.1s, opacity 0.2s;
+}
+
+.btn:hover {
+  transform: scale(1.05);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-ari {
+  background: #e94560;
+  color: white;
+}
+
+.btn-chenhao {
+  background: #0f3460;
+  color: white;
+}
+
+.btn-primary {
+  background: #e94560;
+  color: white;
+}
+
+.btn-secondary {
+  background: #0f3460;
+  color: white;
+}
+
+/* Score Display */
+.score-display {
+  text-align: center;
+  margin-bottom: 2rem;
+  font-size: 1.2rem;
+}
+
+.score-display span {
+  font-weight: bold;
+  color: #e94560;
+}
+
+/* Result feedback */
+.result {
+  text-align: center;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+.result.correct {
+  background: #1b4332;
+  color: #95d5b2;
+}
+
+.result.incorrect {
+  background: #5c1a1a;
+  color: #f8a0a0;
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+textarea,
+select {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  background: #fff;
+  color: #333;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #e94560;
+}
+
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+/* Archive list */
+.archive-week {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e9ecef;
+}
+
+.archive-week h3 {
+  color: #e94560;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #dee2e6;
+  padding-bottom: 0.5rem;
+}
+
+.archive-item {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.archive-item:last-child {
+  border-bottom: none;
+}
+
+.archive-item .author {
+  font-weight: 600;
+  color: #e94560;
+}
+
+/* Login form */
+.login-form {
+  max-width: 400px;
+  margin: 2rem auto;
+  background: #f8f9fa;
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+/* Messages */
+.message {
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.message.error {
+  background: #5c1a1a;
+  color: #f8a0a0;
+}
+
+.message.success {
+  background: #1b4332;
+  color: #95d5b2;
+}
+
+/* Loading state */
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #888;
+}
+
+/* About page */
+.about-section {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e9ecef;
+}
+
+.about-section h2 {
+  color: #e94560;
+  margin-bottom: 1rem;
+}
+
+.about-section ul {
+  margin-left: 1.5rem;
+}
+
+.about-section li {
+  margin-bottom: 0.5rem;
+}
+
+/* Week navigation */
+.week-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.week-nav h2 {
+  margin: 0;
+}
+
+/* Progress indicator */
+.progress {
+  text-align: center;
+  color: #888;
+  margin-bottom: 1rem;
+}
+
+/* Hidden */
+.hidden {
+  display: none !important;
+}
