@@ -1,2 +1,6 @@
 CLAUDE.md
 firestore.rules
+functions/
+.firebaserc
+firebase.json
+firebase-debug.log
