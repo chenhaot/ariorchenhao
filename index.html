@@ -36,6 +36,10 @@
 
         <div class="hot-take-card">
           <p class="hot-take-text" id="hot-take-text"></p>
+          <div class="opinion-buttons" id="opinion-buttons">
+            <button class="btn-opinion" data-vote="agree" onclick="setOpinion('agree')">Agree</button>
+            <button class="btn-opinion" data-vote="disagree" onclick="setOpinion('disagree')">Disagree</button>
+          </div>
 
           <div class="btn-group" id="guess-buttons">
             <button class="btn btn-ari" onclick="guess('Ari')">Ari</button>
@@ -70,12 +74,14 @@
 
   <script type="module">
     import { db } from './js/firebase-config.js';
-    import { collection, query, where, getDocs, addDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { collection, query, where, getDocs, addDoc, doc, getDoc, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     let hotTakes = [];
     let currentIndex = 0;
     let score = 0;
     let guesses = []; // Store user's guesses
+    let opinions = {}; // Store agree/disagree per hot take id
+    let currentOpinion = null; // Current selection before guess
 
     // Get or create a guest ID
     function getGuestId() {
@@ -109,6 +115,46 @@
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
       d.setDate(diff);
       return formatDateLocal(d);
+    }
+
+    async function fetchAndDisplayVoteStats() {
+      try {
+        // Use count aggregation - 2 queries per hottake (agree + disagree)
+        // Each count query = 1 read, regardless of document count
+        const countPromises = hotTakes.map(async (take, i) => {
+          const agreeQuery = query(
+            collection(db, "votes"),
+            where("hottakeId", "==", take.id),
+            where("opinion", "==", "agree")
+          );
+          const disagreeQuery = query(
+            collection(db, "votes"),
+            where("hottakeId", "==", take.id),
+            where("opinion", "==", "disagree")
+          );
+
+          const [agreeSnap, disagreeSnap] = await Promise.all([
+            getCountFromServer(agreeQuery),
+            getCountFromServer(disagreeQuery)
+          ]);
+
+          const agree = agreeSnap.data().count;
+          const disagree = disagreeSnap.data().count;
+          const total = agree + disagree;
+
+          const el = document.getElementById(`vote-stats-${i}`);
+          if (el && total > 0) {
+            const agreePercent = Math.round((agree / total) * 100);
+            const disagreePercent = Math.round((disagree / total) * 100);
+            const yourVote = opinions[take.id] ? ` (You: ${opinions[take.id]})` : '';
+            el.innerHTML = `${agreePercent}% agree, ${disagreePercent}% disagree${yourVote}`;
+          }
+        });
+
+        await Promise.all(countPromises);
+      } catch (error) {
+        console.error("Error fetching vote stats:", error);
+      }
     }
 
     async function loadHotTakes() {
@@ -145,7 +191,34 @@
       const take = hotTakes[currentIndex];
       document.getElementById('hot-take-text').textContent = take.text;
       document.getElementById('progress').textContent = `${currentIndex + 1} of ${hotTakes.length}`;
+
+      // Reset opinion buttons
+      currentOpinion = null;
+      document.querySelectorAll('.btn-opinion').forEach(btn => btn.classList.remove('selected'));
     }
+
+    window.setOpinion = async function(opinion) {
+      const take = hotTakes[currentIndex];
+      currentOpinion = opinion;
+      opinions[take.id] = opinion;
+
+      // Update button styles
+      document.querySelectorAll('.btn-opinion').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.vote === opinion);
+      });
+
+      // Save vote immediately
+      try {
+        await addDoc(collection(db, "votes"), {
+          hottakeId: take.id,
+          opinion: opinion,
+          weekOf: getCurrentWeekMonday(),
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error("Error saving vote:", error);
+      }
+    };
 
     window.guess = function(guessedAuthor) {
       const take = hotTakes[currentIndex];
@@ -187,7 +260,7 @@
 
       document.getElementById('score-message').textContent = msg;
 
-      // Show all results
+      // Show all results (will be updated with vote stats)
       const resultsEl = document.getElementById('results-list');
       resultsEl.innerHTML = guesses.map((g, i) => `
         <div class="hot-take-card" style="margin-bottom: 1rem;">
@@ -198,6 +271,9 @@
               ${g.correct ? 'You got it!' : 'You guessed ' + escapeHtml(g.guessed)}
             </span>
           </p>
+          <div class="vote-stats" id="vote-stats-${i}" style="text-align: center; margin-top: 0.5rem; font-size: 0.9rem; color: #666;">
+            ${opinions[hotTakes[i].id] ? `You: ${opinions[hotTakes[i].id]}` : ''}
+          </div>
         </div>
       `).join('');
 
@@ -209,11 +285,15 @@
           score: score,
           total: hotTakes.length,
           guesses: guesses,
+          opinions: opinions,
           timestamp: new Date().toISOString()
         });
       } catch (error) {
         console.error("Error saving response:", error);
       }
+
+      // Fetch vote stats and update display
+      await fetchAndDisplayVoteStats();
 
       // Fetch stats and show percentile (with delay for Cloud Function to update)
       setTimeout(async () => {

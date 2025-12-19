@@ -313,3 +313,33 @@ textarea {
 .hidden {
   display: none !important;
 }
+
+/* Opinion buttons (agree/disagree) */
+.opinion-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.btn-opinion {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #fff;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.btn-opinion:hover {
+  border-color: #800000;
+  color: #800000;
+}
+
+.btn-opinion.selected {
+  background: #800000;
+  color: white;
+  border-color: #800000;
+}

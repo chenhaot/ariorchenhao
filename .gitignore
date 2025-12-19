@@ -3,4 +3,5 @@ firestore.rules
 functions/
 .firebaserc
 firebase.json
+firestore.indexes.json
 firebase-debug.log
