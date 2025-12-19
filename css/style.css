@@ -233,6 +233,11 @@ textarea {
   color: #e94560;
 }
 
+.archive-item .vote-stats {
+  font-size: 0.85rem;
+  color: #888;
+}
+
 /* Login form */
 .login-form {
   max-width: 400px;
@@ -319,7 +324,16 @@ textarea {
   display: flex;
   gap: 0.5rem;
   justify-content: center;
+  align-items: center;
   margin-bottom: 1.5rem;
+}
+
+.opinion-label {
+  font-size: 0.75rem;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 0.25rem;
 }
 
 .btn-opinion {

@@ -41,7 +41,7 @@
 
   <script type="module">
     import { db } from './js/firebase-config.js';
-    import { collection, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { collection, query, where, getDocs, orderBy, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     // Escape HTML to prevent XSS
     function escapeHtml(text) {
@@ -53,6 +53,40 @@
     function formatWeekDate(dateStr) {
       const date = new Date(dateStr + 'T00:00:00');
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    async function getVoteStats(takeId) {
+      try {
+        const agreeQuery = query(
+          collection(db, "votes"),
+          where("hottakeId", "==", takeId),
+          where("opinion", "==", "agree")
+        );
+        const disagreeQuery = query(
+          collection(db, "votes"),
+          where("hottakeId", "==", takeId),
+          where("opinion", "==", "disagree")
+        );
+
+        const [agreeSnap, disagreeSnap] = await Promise.all([
+          getCountFromServer(agreeQuery),
+          getCountFromServer(disagreeQuery)
+        ]);
+
+        const agree = agreeSnap.data().count;
+        const disagree = disagreeSnap.data().count;
+        const total = agree + disagree;
+
+        if (total === 0) return null;
+
+        return {
+          agreePercent: Math.round((agree / total) * 100),
+          disagreePercent: Math.round((disagree / total) * 100)
+        };
+      } catch (error) {
+        console.error("Error fetching vote stats:", error);
+        return null;
+      }
     }
 
     async function loadArchive() {
@@ -89,20 +123,34 @@
         // Sort weeks descending
         const weeks = Object.values(grouped).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
 
+        const allTakes = [];
         weeks.forEach(weekData => {
           const weekEl = document.createElement('div');
           weekEl.className = 'archive-week';
 
           weekEl.innerHTML = `
             <h3>Week of ${formatWeekDate(weekData.weekOf)}</h3>
-            ${weekData.takes.map(take => `
+            ${weekData.takes.map(take => {
+              allTakes.push(take);
+              return `
               <div class="archive-item">
                 <span class="author">${escapeHtml(take.author)}:</span> "${escapeHtml(take.text)}"
+                <span class="vote-stats" id="vote-${take.id}"></span>
               </div>
-            `).join('')}
+            `;
+            }).join('')}
           `;
 
           contentEl.appendChild(weekEl);
+        });
+
+        // Fetch vote stats for all takes
+        allTakes.forEach(async (take) => {
+          const stats = await getVoteStats(take.id);
+          const el = document.getElementById(`vote-${take.id}`);
+          if (el && stats) {
+            el.textContent = ` (${stats.agreePercent}% agree, ${stats.disagreePercent}% disagree)`;
+          }
         });
 
       } catch (error) {
