@@ -41,7 +41,11 @@
 
   <script type="module">
     import { db } from './js/firebase-config.js';
-    import { collection, query, where, getDocs, orderBy, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { collection, query, where, getDocs, orderBy, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // Track user votes in this session and local counts for optimistic updates
+    const userVotes = {};
+    const localCounts = {};
 
     // Escape HTML to prevent XSS
     function escapeHtml(text) {
@@ -50,47 +54,94 @@
       return div.innerHTML;
     }
 
+    // Format date as YYYY-MM-DD in local timezone
+    function formatDateLocal(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // Get Monday of current week
+    function getCurrentWeekMonday() {
+      const d = new Date();
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      d.setDate(diff);
+      return formatDateLocal(d);
+    }
+
     function formatWeekDate(dateStr) {
       const date = new Date(dateStr + 'T00:00:00');
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
-    async function getVoteStats(takeId) {
-      try {
-        const agreeQuery = query(
-          collection(db, "votes"),
-          where("hottakeId", "==", takeId),
-          where("opinion", "==", "agree")
-        );
-        const disagreeQuery = query(
-          collection(db, "votes"),
-          where("hottakeId", "==", takeId),
-          where("opinion", "==", "disagree")
-        );
+    function calculateStats(agree, disagree) {
+      const total = agree + disagree;
+      if (total === 0) return null;
+      return {
+        agreePercent: Math.round((agree / total) * 100),
+        disagreePercent: Math.round((disagree / total) * 100)
+      };
+    }
 
-        const [agreeSnap, disagreeSnap] = await Promise.all([
-          getCountFromServer(agreeQuery),
-          getCountFromServer(disagreeQuery)
-        ]);
+    function updateVoteDisplay(takeId) {
+      const counts = localCounts[takeId];
+      if (!counts) return;
 
-        const agree = agreeSnap.data().count;
-        const disagree = disagreeSnap.data().count;
-        const total = agree + disagree;
-
-        if (total === 0) return null;
-
-        return {
-          agreePercent: Math.round((agree / total) * 100),
-          disagreePercent: Math.round((disagree / total) * 100)
-        };
-      } catch (error) {
-        console.error("Error fetching vote stats:", error);
-        return null;
+      const stats = calculateStats(counts.agree, counts.disagree);
+      const el = document.getElementById(`vote-${takeId}`);
+      if (el && stats) {
+        el.textContent = `${stats.agreePercent}% agree, ${stats.disagreePercent}% disagree`;
       }
     }
 
+    window.vote = async function(takeId, opinion, weekOf) {
+      // Prevent double voting
+      if (userVotes[takeId]) return;
+      userVotes[takeId] = opinion;
+
+      // Update button styles
+      const agreeBtn = document.getElementById(`agree-${takeId}`);
+      const disagreeBtn = document.getElementById(`disagree-${takeId}`);
+
+      if (opinion === 'agree') {
+        agreeBtn.classList.add('selected');
+        agreeBtn.disabled = true;
+        disagreeBtn.disabled = true;
+      } else {
+        disagreeBtn.classList.add('selected');
+        agreeBtn.disabled = true;
+        disagreeBtn.disabled = true;
+      }
+
+      // Optimistic update
+      if (localCounts[takeId]) {
+        if (opinion === 'agree') {
+          localCounts[takeId].agree++;
+        } else {
+          localCounts[takeId].disagree++;
+        }
+        updateVoteDisplay(takeId);
+      }
+
+      // Save vote to Firestore (Cloud Function will update the hottake counts)
+      try {
+        await addDoc(collection(db, "votes"), {
+          hottakeId: takeId,
+          opinion: opinion,
+          weekOf: weekOf,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error("Error saving vote:", error);
+      }
+    };
+
     async function loadArchive() {
       try {
+        const currentWeek = getCurrentWeekMonday();
+
         const q = query(
           collection(db, "hottakes"),
           where("approved", "==", true),
@@ -98,7 +149,10 @@
         );
 
         const snapshot = await getDocs(q);
-        const takes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const allTakes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Filter out current week's hot takes
+        const takes = allTakes.filter(take => take.weekOf !== currentWeek);
 
         document.getElementById('loading').classList.add('hidden');
 
@@ -106,6 +160,15 @@
           document.getElementById('no-archive').classList.remove('hidden');
           return;
         }
+
+        // Store local counts and calculate stats from cached counts on documents
+        const statsMap = {};
+        takes.forEach(take => {
+          const agree = take.agreeCount || 0;
+          const disagree = take.disagreeCount || 0;
+          localCounts[take.id] = { agree, disagree };
+          statsMap[take.id] = calculateStats(agree, disagree);
+        });
 
         // Group by weekOf
         const grouped = {};
@@ -117,13 +180,23 @@
           grouped[key].takes.push(take);
         });
 
+        // Sort takes within each week by agree percentage (descending)
+        Object.values(grouped).forEach(weekData => {
+          weekData.takes.sort((a, b) => {
+            const statsA = statsMap[a.id];
+            const statsB = statsMap[b.id];
+            const agreeA = statsA ? statsA.agreePercent : 0;
+            const agreeB = statsB ? statsB.agreePercent : 0;
+            return agreeB - agreeA;
+          });
+        });
+
         const contentEl = document.getElementById('archive-content');
         contentEl.classList.remove('hidden');
 
         // Sort weeks descending
         const weeks = Object.values(grouped).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
 
-        const allTakes = [];
         weeks.forEach(weekData => {
           const weekEl = document.createElement('div');
           weekEl.className = 'archive-week';
@@ -131,26 +204,26 @@
           weekEl.innerHTML = `
             <h3>Week of ${formatWeekDate(weekData.weekOf)}</h3>
             ${weekData.takes.map(take => {
-              allTakes.push(take);
+              const stats = statsMap[take.id];
+              const statsText = stats ? `${stats.agreePercent}% agree, ${stats.disagreePercent}% disagree` : '';
               return `
               <div class="archive-item">
-                <span class="author">${escapeHtml(take.author)}:</span> "${escapeHtml(take.text)}"
-                <span class="vote-stats" id="vote-${take.id}"></span>
+                <div class="archive-take-content">
+                  <span class="author">${escapeHtml(take.author)}:</span> "${escapeHtml(take.text)}"
+                </div>
+                <div class="archive-vote-row">
+                  <div class="archive-buttons">
+                    <button class="btn-opinion" id="agree-${take.id}" onclick="vote('${take.id}', 'agree', '${take.weekOf}')">Agree</button>
+                    <button class="btn-opinion" id="disagree-${take.id}" onclick="vote('${take.id}', 'disagree', '${take.weekOf}')">Disagree</button>
+                  </div>
+                  <span class="vote-stats" id="vote-${take.id}">${statsText}</span>
+                </div>
               </div>
             `;
             }).join('')}
           `;
 
           contentEl.appendChild(weekEl);
-        });
-
-        // Fetch vote stats for all takes
-        allTakes.forEach(async (take) => {
-          const stats = await getVoteStats(take.id);
-          const el = document.getElementById(`vote-${take.id}`);
-          if (el && stats) {
-            el.textContent = ` (${stats.agreePercent}% agree, ${stats.disagreePercent}% disagree)`;
-          }
         });
 
       } catch (error) {

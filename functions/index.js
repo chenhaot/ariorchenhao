@@ -1,9 +1,35 @@
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
 initializeApp();
 const db = getFirestore();
+
+// Trigger when a new vote is created - increment counts on hottake
+exports.updateVoteCounts = onDocumentCreated("votes/{voteId}", async (event) => {
+  const vote = event.data.data();
+  const hottakeId = vote.hottakeId;
+  const opinion = vote.opinion;
+
+  if (!hottakeId || !opinion) {
+    console.log("Missing required fields in vote");
+    return null;
+  }
+
+  const hottakeRef = db.collection("hottakes").doc(hottakeId);
+  const field = opinion === "agree" ? "agreeCount" : "disagreeCount";
+
+  try {
+    await hottakeRef.update({
+      [field]: FieldValue.increment(1),
+    });
+    console.log(`Incremented ${field} for hottake ${hottakeId}`);
+    return null;
+  } catch (error) {
+    console.error("Error updating vote count:", error);
+    return null;
+  }
+});
 
 // Trigger when a new response is created
 exports.updateStats = onDocumentCreated("responses/{responseId}", async (event) => {

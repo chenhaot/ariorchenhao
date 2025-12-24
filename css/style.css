@@ -238,6 +238,27 @@ textarea {
   color: #888;
 }
 
+.archive-take-content {
+  margin-bottom: 0.5rem;
+}
+
+.archive-vote-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.archive-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.archive-buttons .btn-opinion:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Login form */
 .login-form {
   max-width: 400px;
