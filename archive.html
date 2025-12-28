@@ -145,14 +145,12 @@
         const q = query(
           collection(db, "hottakes"),
           where("approved", "==", true),
+          where("weekOf", "<", currentWeek),
           orderBy("weekOf", "desc")
         );
 
         const snapshot = await getDocs(q);
-        const allTakes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        // Filter out current week's hot takes
-        const takes = allTakes.filter(take => take.weekOf !== currentWeek);
+        const takes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
         document.getElementById('loading').classList.add('hidden');
 
