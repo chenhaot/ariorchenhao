@@ -178,14 +178,14 @@
           grouped[key].takes.push(take);
         });
 
-        // Sort takes within each week by agree percentage (descending)
+        // Sort takes within each week by agree percentage (ascending - least agreed first)
         Object.values(grouped).forEach(weekData => {
           weekData.takes.sort((a, b) => {
             const statsA = statsMap[a.id];
             const statsB = statsMap[b.id];
             const agreeA = statsA ? statsA.agreePercent : 0;
             const agreeB = statsB ? statsB.agreePercent : 0;
-            return agreeB - agreeA;
+            return agreeA - agreeB;
           });
         });
 
